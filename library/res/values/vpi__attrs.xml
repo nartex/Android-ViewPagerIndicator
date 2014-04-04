@@ -55,6 +55,12 @@
         <attr name="strokeWidth" />
         <!-- View background -->
         <attr name="android:background"/>
+        <!-- Spacing between circles. Radius value by default. -->
+        <attr name="spacing" format="dimension" />
+        
+        <!-- Spacing between circles. Radius value by default. -->
+        <attr name="borderGradientColor" format="color" />
+        <attr name="borderGradientSize" format="dimension" />
     </declare-styleable>
 
     <declare-styleable name="LinePageIndicator">
