@@ -16,12 +16,18 @@
  */
 package com.viewpagerindicator;
 
+import static android.graphics.Paint.ANTI_ALIAS_FLAG;
+import static android.widget.LinearLayout.HORIZONTAL;
+import static android.widget.LinearLayout.VERTICAL;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Paint.Style;
+import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -32,10 +38,6 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
-
-import static android.graphics.Paint.ANTI_ALIAS_FLAG;
-import static android.widget.LinearLayout.HORIZONTAL;
-import static android.widget.LinearLayout.VERTICAL;
 
 /**
  * Draws circles (one for each view). The current view position is filled and
@@ -57,11 +59,19 @@ public class CirclePageIndicator extends View implements PageIndicator {
     private int mOrientation;
     private boolean mCentered;
     private boolean mSnap;
+    private float mSpacing;
 
     private int mTouchSlop;
     private float mLastMotionX = -1;
     private int mActivePointerId = INVALID_POINTER;
     private boolean mIsDragging;
+    
+    private Paint mLeftBorderGradientPaint;
+    private Paint mRightBorderGradientPaint;
+    private float mGradientSize; 
+    private int mBorderGradientColor;
+    private int mLastWidth = 0;
+    private int mLastHeight = 0;
 
 
     public CirclePageIndicator(Context context) {
@@ -101,6 +111,19 @@ public class CirclePageIndicator extends View implements PageIndicator {
         mPaintFill.setColor(a.getColor(R.styleable.CirclePageIndicator_fillColor, defaultFillColor));
         mRadius = a.getDimension(R.styleable.CirclePageIndicator_radius, defaultRadius);
         mSnap = a.getBoolean(R.styleable.CirclePageIndicator_snap, defaultSnap);
+        mSpacing = a.getDimension(R.styleable.CirclePageIndicator_spacing, mRadius);
+        mGradientSize = a.getDimension(R.styleable.CirclePageIndicator_borderGradientSize, 0);
+        
+        if (mGradientSize > 0){
+        	mBorderGradientColor = a.getColor(R.styleable.CirclePageIndicator_borderGradientColor, Color.TRANSPARENT);
+            
+            mLeftBorderGradientPaint = new Paint();
+            mLeftBorderGradientPaint.setAntiAlias(true);
+            mLeftBorderGradientPaint.setShader(new LinearGradient(0, 0, mGradientSize, 0, mBorderGradientColor, 0x0, Shader.TileMode.CLAMP));
+            
+            mRightBorderGradientPaint = new Paint();
+            mRightBorderGradientPaint.setAntiAlias(true);
+        }        
 
         Drawable background = a.getDrawable(R.styleable.CirclePageIndicator_android_background);
         if (background != null) {
@@ -180,9 +203,18 @@ public class CirclePageIndicator extends View implements PageIndicator {
         mRadius = radius;
         invalidate();
     }
-
+    
     public float getRadius() {
         return mRadius;
+    }
+    
+    public void setSpacing(float spacing){
+    	mSpacing = spacing;
+    	invalidate();
+    }
+    
+    public float getSpacing(){
+    	return mSpacing;
     }
 
     public void setSnap(boolean snap) {
@@ -227,12 +259,18 @@ public class CirclePageIndicator extends View implements PageIndicator {
             shortPaddingBefore = getPaddingLeft();
         }
 
-        final float threeRadius = mRadius * 3;
+        final float circleGap = mRadius * 2 + mSpacing;
         final float shortOffset = shortPaddingBefore + mRadius;
         float longOffset = longPaddingBefore + mRadius;
         if (mCentered) {
-            longOffset += ((longSize - longPaddingBefore - longPaddingAfter) / 2.0f) - ((count * threeRadius) / 2.0f);
+        	if ((count * circleGap) <= (longSize - longPaddingBefore - longPaddingAfter)){
+        		longOffset += ((longSize - longPaddingBefore - longPaddingAfter) / 2.0f) - ((count * circleGap) / 2.0f);
+        	}else{
+        		longOffset -= ((((mCurrentPage + mPageOffset) * circleGap) / (count * circleGap))) * ((count * circleGap) - (longSize - longPaddingBefore - longPaddingAfter));
+        	} 
         }
+        
+        
 
         float dX;
         float dY;
@@ -244,7 +282,7 @@ public class CirclePageIndicator extends View implements PageIndicator {
 
         //Draw stroked circles
         for (int iLoop = 0; iLoop < count; iLoop++) {
-            float drawLong = longOffset + (iLoop * threeRadius);
+            float drawLong = longOffset + (iLoop * circleGap);
             if (mOrientation == HORIZONTAL) {
                 dX = drawLong;
                 dY = shortOffset;
@@ -264,9 +302,9 @@ public class CirclePageIndicator extends View implements PageIndicator {
         }
 
         //Draw the filled circle according to the current scroll
-        float cx = (mSnap ? mSnapPage : mCurrentPage) * threeRadius;
+        float cx = (mSnap ? mSnapPage : mCurrentPage) * circleGap;
         if (!mSnap) {
-            cx += mPageOffset * threeRadius;
+            cx += mPageOffset * circleGap;
         }
         if (mOrientation == HORIZONTAL) {
             dX = longOffset + cx;
@@ -276,6 +314,15 @@ public class CirclePageIndicator extends View implements PageIndicator {
             dY = longOffset + cx;
         }
         canvas.drawCircle(dX, dY, mRadius, mPaintFill);
+        
+        if (mGradientSize > 0){
+        	if (mLastWidth != getWidth()){
+        		mLastWidth = getWidth();
+        		mRightBorderGradientPaint.setShader(new LinearGradient(getWidth() - mGradientSize, 0, getWidth(), 0, 0x0, mBorderGradientColor, Shader.TileMode.CLAMP));
+        	}
+        	canvas.drawPaint(mLeftBorderGradientPaint);
+        	canvas.drawPaint(mRightBorderGradientPaint);
+        }
     }
 
     public boolean onTouchEvent(android.view.MotionEvent ev) {
